@@ -22,6 +22,9 @@ var files = [
   "pages/index/index.wxml",
   "pages/index/index.wxss",
   "project.config.json",
+  "js/cloud-state.js",
+  "cloudfunctions/playerState/index.js",
+  "cloudfunctions/playerState/package.json",
   "js/logic.js"
 ];
 var fullFiles = [
@@ -33,6 +36,7 @@ var fullFiles = [
   "README.md",
   "package.json",
   "open-in-wechat-devtools.command",
+  "cloudfunctions",
   "js",
   "pages",
   "scripts",

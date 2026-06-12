@@ -10,8 +10,11 @@ var releaseZip = path.resolve(root, "..", "wechat-mini-arcade-release.zip");
 var cliPath = "/Applications/wechatwebdevtools.app/Contents/MacOS/cli";
 var expectedFiles = [
   "app.json",
+  "cloudfunctions/playerState/index.js",
+  "cloudfunctions/playerState/package.json",
   "game.js",
   "game.json",
+  "js/cloud-state.js",
   "js/logic.js",
   "pages/index/index.js",
   "pages/index/index.json",
@@ -51,12 +54,16 @@ function assertOnlyKnownRequires(source) {
   var requirePattern = /require\((["'])(.*?)\1\)/g;
   var match = null;
   var count = 0;
+  var allowed = {
+    "./js/logic.js": true,
+    "./js/cloud-state.js": true
+  };
   while ((match = requirePattern.exec(source))) {
     count += 1;
-    if (match[2] !== "./js/logic.js") fail("unexpected runtime require: " + match[2]);
+    if (!allowed[match[2]]) fail("unexpected runtime require: " + match[2]);
     if (!fs.existsSync(path.join(releaseDir, match[2]))) fail("missing required release file: " + match[2]);
   }
-  if (count !== 1) fail("expected exactly one runtime require, found " + count);
+  if (count !== 2) fail("expected exactly two runtime requires, found " + count);
 }
 
 function checkCli() {
@@ -92,6 +99,7 @@ var appConfig = readJson(path.join(releaseDir, "app.json"));
 var gameConfig = readJson(path.join(releaseDir, "game.json"));
 if (projectConfig.compileType !== "game") fail("project.config.json compileType must be game");
 if (projectConfig.appid !== "touristappid") fail("project.config.json appid should be touristappid for direct import");
+if (projectConfig.cloudfunctionRoot !== "cloudfunctions/") fail("project.config.json cloudfunctionRoot must point at cloudfunctions/");
 if (!projectConfig.setting || projectConfig.setting.packNpmManually !== false) fail("release should not require npm packing");
 if (!Array.isArray(appConfig.pages) || appConfig.pages[0] !== "pages/index/index") fail("app.json pages must include pages/index/index");
 if (appConfig.deviceOrientation !== "portrait") fail("app.json deviceOrientation must be portrait");
@@ -99,9 +107,15 @@ if (appConfig.showStatusBar !== false) fail("app.json showStatusBar must be fals
 if (gameConfig.deviceOrientation !== "portrait") fail("game.json deviceOrientation must be portrait");
 
 var gameSource = fs.readFileSync(path.join(releaseDir, "game.js"), "utf8");
+var cloudSource = fs.readFileSync(path.join(releaseDir, "js", "cloud-state.js"), "utf8");
+var functionSource = fs.readFileSync(path.join(releaseDir, "cloudfunctions", "playerState", "index.js"), "utf8");
 var logicSource = fs.readFileSync(path.join(releaseDir, "js", "logic.js"), "utf8");
 var runtimeSource = gameSource + "\n" + logicSource;
 assertOnlyKnownRequires(gameSource);
+if (gameSource.indexOf("CloudState") === -1) fail("game.js should wire cloud state sync");
+if (cloudSource.indexOf("wxApi.login") === -1) fail("cloud state should call wx.login");
+if (cloudSource.indexOf("callFunction") === -1) fail("cloud state should call a cloud function");
+if (functionSource.indexOf("OPENID") === -1) fail("cloud function should persist state by WeChat OPENID");
 if (/https?:\/\//.test(runtimeSource)) fail("release runtime should not use remote assets");
 if (/\b(document|window|localStorage|fetch|XMLHttpRequest)\b/.test(runtimeSource)) fail("release runtime should not use browser-only APIs");
 if (/\b(const|let|class|async|await|Promise|Number\.isFinite)\b/.test(runtimeSource)) fail("release runtime should avoid newer syntax/APIs");

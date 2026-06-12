@@ -9,8 +9,11 @@ var releaseDir = path.resolve(root, "..", "wechat-mini-arcade-release");
 var releaseZip = path.resolve(root, "..", "wechat-mini-arcade-release.zip");
 var expectedFiles = [
   "app.json",
+  "cloudfunctions/playerState/index.js",
+  "cloudfunctions/playerState/package.json",
   "game.js",
   "game.json",
+  "js/cloud-state.js",
   "js/logic.js",
   "pages/index/index.js",
   "pages/index/index.json",
@@ -44,10 +47,14 @@ var projectConfig = JSON.parse(fs.readFileSync(path.join(releaseDir, "project.co
 var appConfig = JSON.parse(fs.readFileSync(path.join(releaseDir, "app.json"), "utf8"));
 var gameConfig = JSON.parse(fs.readFileSync(path.join(releaseDir, "game.json"), "utf8"));
 assert.strictEqual(projectConfig.compileType, "game");
+assert.strictEqual(projectConfig.cloudfunctionRoot, "cloudfunctions/");
 assert.deepStrictEqual(appConfig.pages, ["pages/index/index"]);
 assert.strictEqual(appConfig.deviceOrientation, "portrait");
 assert.strictEqual(appConfig.showStatusBar, false);
 assert.strictEqual(gameConfig.deviceOrientation, "portrait");
+assert.ok(fs.readFileSync(path.join(releaseDir, "game.js"), "utf8").indexOf("CloudState") !== -1);
+assert.ok(fs.readFileSync(path.join(releaseDir, "js", "cloud-state.js"), "utf8").indexOf("wxApi.login") !== -1);
+assert.ok(fs.readFileSync(path.join(releaseDir, "cloudfunctions", "playerState", "index.js"), "utf8").indexOf("OPENID") !== -1);
 
 global.requestAnimationFrame = function () {
   return 1;

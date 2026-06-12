@@ -7,9 +7,12 @@ var path = require("path");
 var root = path.resolve(__dirname, "..");
 var requiredFiles = [
   "app.json",
+  "cloudfunctions/playerState/index.js",
+  "cloudfunctions/playerState/package.json",
   "game.js",
   "game.json",
   "project.config.json",
+  "js/cloud-state.js",
   "js/logic.js",
   "pages/index/index.js",
   "pages/index/index.json",
@@ -27,6 +30,7 @@ var gameConfig = JSON.parse(fs.readFileSync(path.join(root, "game.json"), "utf8"
 
 assert.strictEqual(projectConfig.compileType, "game");
 assert.strictEqual(projectConfig.appid, "touristappid");
+assert.strictEqual(projectConfig.cloudfunctionRoot, "cloudfunctions/");
 assert.strictEqual(projectConfig.setting.es6, true);
 assert.strictEqual(projectConfig.setting.packNpmManually, false);
 assert.deepStrictEqual(appConfig.pages, ["pages/index/index"]);
@@ -46,6 +50,7 @@ assert.ok(/setTransform|scale/.test(gameSource), "game.js should scale canvas dr
 assert.ok(/wx\.requestAnimationFrame/.test(gameSource), "game.js should prefer wx.requestAnimationFrame when present");
 assert.ok(/onHide/.test(gameSource) && /onShow/.test(gameSource), "game.js should handle app lifecycle hooks");
 assert.ok(/module\.exports/.test(gameSource), "game.js should expose a module for smoke tests");
+assert.ok(/CloudState/.test(gameSource), "game.js should wire cloud state sync");
 assert.ok(/module\.exports/.test(logicSource), "logic.js should expose gameplay logic");
 assert.ok(!/WeChat Mini Game Canvas/.test(runtimeSource), "runtime should not show technical placeholder text");
 assert.ok(!/https?:\/\//.test(runtimeSource), "runtime should not depend on remote assets");
@@ -54,7 +59,7 @@ assert.ok(!/\b(const|let|class|async|await|Promise|Number\.isFinite)\b/.test(run
 
 var requireMatches = runtimeSource.match(/require\((["'])(.*?)\1\)/g) || [];
 requireMatches.forEach(function (call) {
-  assert.ok(/require\((["'])\.\/js\/logic\.js\1\)/.test(call), "unexpected runtime require: " + call);
+  assert.ok(/require\((["'])\.\/js\/(?:logic|cloud-state)\.js\1\)/.test(call), "unexpected runtime require: " + call);
 });
 
 console.log("project tests passed");

@@ -11,8 +11,11 @@ var releaseZip = path.join(outputRoot, "wechat-mini-arcade-release.zip");
 var fullZip = path.join(outputRoot, "wechat-mini-arcade.zip");
 var requiredReleaseFiles = [
   "app.json",
+  "cloudfunctions/playerState/index.js",
+  "cloudfunctions/playerState/package.json",
   "game.js",
   "game.json",
+  "js/cloud-state.js",
   "js/logic.js",
   "pages/index/index.js",
   "pages/index/index.json",
@@ -35,6 +38,7 @@ var requiredTests = [
   "preview.test.js",
   "preview-runtime.test.js",
   "stress.test.js",
+  "cloud-state.test.js",
   "release.test.js",
   "release-devtools.test.js"
 ];
@@ -89,8 +93,14 @@ function assertZip(zipPath, name) {
 
 function assertRuntimeSource() {
   var game = read(path.join(releaseDir, "game.js"));
+  var cloudState = read(path.join(releaseDir, "js", "cloud-state.js"));
+  var cloudFunction = read(path.join(releaseDir, "cloudfunctions", "playerState", "index.js"));
   var logic = read(path.join(releaseDir, "js", "logic.js"));
   var runtime = game + "\n" + logic;
+  assertContains(game, "CloudState", "runtime cloud state");
+  assertContains(cloudState, "wxApi.login", "cloud login");
+  assertContains(cloudState, "callFunction", "cloud function call");
+  assertContains(cloudFunction, "OPENID", "cloud function identity");
   assertContains(game, "wx.createCanvas", "runtime canvas");
   assertContains(game, "wx.requestAnimationFrame", "runtime animation frame");
   assertContains(game, "onHide", "runtime lifecycle hide");
@@ -110,6 +120,7 @@ function assertConfigs() {
   var game = readJson(path.join(releaseDir, "game.json"));
   if (project.compileType !== "game") fail("project compile type", String(project.compileType));
   if (project.appid !== "touristappid") fail("project appid", String(project.appid));
+  if (project.cloudfunctionRoot !== "cloudfunctions/") fail("cloud function root", String(project.cloudfunctionRoot));
   if (!project.setting || project.setting.packNpmManually !== false) fail("npm packing", "release should not need npm packing");
   if (!Array.isArray(app.pages) || app.pages[0] !== "pages/index/index") fail("app pages", JSON.stringify(app.pages));
   if (app.deviceOrientation !== "portrait") fail("app orientation", String(app.deviceOrientation));

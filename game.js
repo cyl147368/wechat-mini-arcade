@@ -1,6 +1,10 @@
 "use strict";
 
 var Logic = require("./js/logic.js");
+var CloudState = require("./js/cloud-state.js");
+
+var GAME_ID = "wechat-mini-arcade";
+var CLOUD_STORAGE_KEY = "wechat-mini-arcade-best-v1";
 
 function numberValue(value) {
   var number = Number(value);
@@ -12,6 +16,15 @@ function finiteNumber(value, fallback) {
   if (isFinite(number)) return number;
   number = numberValue(fallback);
   return isFinite(number) ? number : 0;
+}
+
+function sanitizeBestState(input) {
+  input = input || {};
+  return {
+    merge: Math.max(0, Math.floor(finiteNumber(input.merge, 0))),
+    snake: Math.max(0, Math.floor(finiteNumber(input.snake, 0))),
+    dodge: Math.max(0, Math.floor(finiteNumber(input.dodge, 0)))
+  };
 }
 
 function ArcadeApp(wxApi) {
@@ -32,11 +45,18 @@ function ArcadeApp(wxApi) {
     snake: this.readBest("snake"),
     dodge: this.readBest("dodge")
   };
+  this.cloudSync = CloudState.create({
+    wx: this.wx,
+    gameId: GAME_ID,
+    storageKey: CLOUD_STORAGE_KEY,
+    sanitize: sanitizeBestState
+  });
   this.merge = new Logic.Merge2048Game(4, new Logic.RNG());
   this.snake = new Logic.SnakeGame(18, 24, new Logic.RNG());
   this.dodge = new Logic.DodgeGame(this.width, this.height, new Logic.RNG());
   this.resize();
   this.bindEvents();
+  this.startCloudSync();
   this.loop = this.loop.bind(this);
   this.requestFrame(this.loop);
 }
@@ -63,6 +83,38 @@ ArcadeApp.prototype.writeBest = function (key, score) {
   } catch (error) {
     // Storage is optional in dev tools guest mode; gameplay must continue without it.
   }
+  this.saveCloudBest();
+};
+
+ArcadeApp.prototype.applyBestState = function (remoteBest) {
+  var best = sanitizeBestState(remoteBest);
+  var changed = false;
+  var keys = ["merge", "snake", "dodge"];
+  for (var i = 0; i < keys.length; i += 1) {
+    var key = keys[i];
+    if (best[key] > this.best[key]) {
+      this.best[key] = best[key];
+      changed = true;
+      try {
+        if (this.wx.setStorageSync) this.wx.setStorageSync("arcade_best_" + key, best[key]);
+      } catch (error) {}
+    }
+  }
+  if (changed) this.draw();
+};
+
+ArcadeApp.prototype.saveCloudBest = function () {
+  if (this.cloudSync && typeof this.cloudSync.save === "function") this.cloudSync.save(this.best);
+};
+
+ArcadeApp.prototype.startCloudSync = function () {
+  var self = this;
+  if (!this.cloudSync || typeof this.cloudSync.start !== "function") return;
+  this.cloudSync.start(function (remoteBest) {
+    if (!remoteBest) return;
+    self.applyBestState(remoteBest);
+    self.saveCloudBest();
+  });
 };
 
 ArcadeApp.prototype.requestFrame = function (handler) {
@@ -125,6 +177,7 @@ ArcadeApp.prototype.bindEvents = function () {
       self.paused = true;
       self.lastTime = 0;
       self.recordCurrentScore();
+      self.saveCloudBest();
     });
   }
   if (typeof this.wx.onShow === "function") {
@@ -132,6 +185,11 @@ ArcadeApp.prototype.bindEvents = function () {
       self.paused = false;
       self.lastTime = 0;
       self.resize();
+      if (self.cloudSync && typeof self.cloudSync.load === "function") {
+        self.cloudSync.load(function (remoteBest) {
+          if (remoteBest) self.applyBestState(remoteBest);
+        });
+      }
     });
   }
 };

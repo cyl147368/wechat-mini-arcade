@@ -67,12 +67,16 @@ function assertOnlyInternalRequires(source) {
   var requirePattern = /require\((["'])(.*?)\1\)/g;
   var match = null;
   var count = 0;
+  var allowed = {
+    "./js/logic.js": true,
+    "./js/cloud-state.js": true
+  };
   while ((match = requirePattern.exec(source))) {
     count += 1;
-    assert.strictEqual(match[2], "./js/logic.js", "unexpected release require: " + match[2]);
+    assert.ok(allowed[match[2]], "unexpected release require: " + match[2]);
     assert.ok(fs.existsSync(path.join(releaseDir, match[2])), "required file missing from release");
   }
-  assert.strictEqual(count, 1, "release should have exactly one local runtime require");
+  assert.strictEqual(count, 2, "release should have exactly two local runtime requires");
 }
 
 function assertButtonsInside(app) {
@@ -101,6 +105,7 @@ var runtimeSource = gameSource + "\n" + logicSource;
 
 assert.strictEqual(projectConfig.compileType, "game");
 assert.strictEqual(projectConfig.appid, "touristappid");
+assert.strictEqual(projectConfig.cloudfunctionRoot, "cloudfunctions/");
 assert.strictEqual(gameConfig.deviceOrientation, "portrait");
 assert.ok(!/https?:\/\//.test(runtimeSource), "release runtime should not depend on remote assets");
 assert.ok(!/\b(document|window|localStorage|fetch|XMLHttpRequest)\b/.test(runtimeSource), "release runtime should avoid browser-only APIs");

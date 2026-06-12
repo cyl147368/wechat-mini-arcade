@@ -1,6 +1,7 @@
 {
   "appid": "touristappid",
   "compileType": "game",
+  "cloudfunctionRoot": "cloudfunctions/",
   "libVersion": "3.8.10",
   "projectname": "wechat-mini-arcade",
   "condition": {},
