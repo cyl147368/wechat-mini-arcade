@@ -1,0 +1,21 @@
+{
+  "appid": "touristappid",
+  "compileType": "game",
+  "libVersion": "3.8.10",
+  "projectname": "wechat-mini-arcade",
+  "condition": {},
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "postcss": false,
+    "minified": false,
+    "enhance": true,
+    "showShadowRootInWxmlPanel": false,
+    "packNpmManually": false,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    }
+  }
+}

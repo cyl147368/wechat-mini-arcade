@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>小游戏精选预览</title>
+  <style>
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background: #0f172a;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+
+    #stage {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      touch-action: none;
+    }
+
+    #toolbar {
+      position: fixed;
+      left: 10px;
+      bottom: 10px;
+      display: flex;
+      gap: 8px;
+      z-index: 2;
+    }
+
+    #toolbar button {
+      border: 0;
+      border-radius: 8px;
+      background: rgba(248, 250, 252, 0.92);
+      color: #111827;
+      font-weight: 700;
+      padding: 8px 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="stage"></canvas>
+  <div id="toolbar">
+    <button data-action="menu">菜单</button>
+    <button data-action="play:merge">2048</button>
+    <button data-action="play:snake">蛇</button>
+    <button data-action="play:dodge">躲避</button>
+  </div>
+
+  <script>
+    (function () {
+      var canvas = document.getElementById("stage");
+      var touchStartHandlers = [];
+      var touchMoveHandlers = [];
+      var touchEndHandlers = [];
+      var touchCancelHandlers = [];
+      var resizeHandlers = [];
+      var hideHandlers = [];
+      var showHandlers = [];
+      var storage = {};
+      window.__previewModules = {};
+
+      function pointFromEvent(event) {
+        var rect = canvas.getBoundingClientRect();
+        var source = event.touches && event.touches.length ? event.touches[0] : event;
+        return {
+          clientX: source.clientX - rect.left,
+          clientY: source.clientY - rect.top
+        };
+      }
+
+      function emit(list, event) {
+        for (var i = 0; i < list.length; i += 1) list[i](event);
+      }
+
+      function bindPointer() {
+        var active = false;
+        canvas.addEventListener("pointerdown", function (event) {
+          active = true;
+          canvas.setPointerCapture(event.pointerId);
+          emit(touchStartHandlers, { touches: [pointFromEvent(event)] });
+        });
+        canvas.addEventListener("pointermove", function (event) {
+          if (!active) return;
+          emit(touchMoveHandlers, { touches: [pointFromEvent(event)] });
+        });
+        canvas.addEventListener("pointerup", function (event) {
+          if (!active) return;
+          active = false;
+          emit(touchEndHandlers, { changedTouches: [pointFromEvent(event)] });
+        });
+        canvas.addEventListener("pointercancel", function () {
+          active = false;
+          emit(touchCancelHandlers, {});
+        });
+      }
+
+      window.wx = {
+        createCanvas: function () {
+          return canvas;
+        },
+        getSystemInfoSync: function () {
+          return {
+            windowWidth: window.innerWidth,
+            windowHeight: window.innerHeight,
+            pixelRatio: window.devicePixelRatio || 1
+          };
+        },
+        getStorageSync: function (key) {
+          return storage[key] || 0;
+        },
+        setStorageSync: function (key, value) {
+          storage[key] = value;
+        },
+        onTouchStart: function (handler) {
+          touchStartHandlers.push(handler);
+        },
+        onTouchMove: function (handler) {
+          touchMoveHandlers.push(handler);
+        },
+        onTouchEnd: function (handler) {
+          touchEndHandlers.push(handler);
+        },
+        onTouchCancel: function (handler) {
+          touchCancelHandlers.push(handler);
+        },
+        onWindowResize: function (handler) {
+          resizeHandlers.push(handler);
+        },
+        onHide: function (handler) {
+          hideHandlers.push(handler);
+        },
+        onShow: function (handler) {
+          showHandlers.push(handler);
+        }
+      };
+
+      window.require = function (name) {
+        if (name === "./js/logic.js" || name === "js/logic.js") return window.__previewModules.logic;
+        throw new Error("Unsupported require: " + name);
+      };
+
+      window.__previewReady = function () {
+        window.__arcadeApp = window.__previewModules.game.app;
+        window.addEventListener("resize", function () {
+          for (var i = 0; i < resizeHandlers.length; i += 1) resizeHandlers[i]();
+        });
+        window.addEventListener("blur", function () {
+          for (var i = 0; i < hideHandlers.length; i += 1) hideHandlers[i]();
+        });
+        window.addEventListener("focus", function () {
+          for (var i = 0; i < showHandlers.length; i += 1) showHandlers[i]();
+        });
+        document.getElementById("toolbar").addEventListener("click", function (event) {
+          var action = event.target && event.target.getAttribute("data-action");
+          if (action && window.__arcadeApp) window.__arcadeApp.runAction(action);
+        });
+        bindPointer();
+      };
+    }());
+  </script>
+
+  <script>
+    window.module = { exports: {} };
+    window.exports = window.module.exports;
+  </script>
+  <script src="../js/logic.js"></script>
+  <script>
+    window.__previewModules.logic = window.module.exports;
+    window.module = { exports: {} };
+    window.exports = window.module.exports;
+  </script>
+  <script src="../game.js"></script>
+  <script>
+    window.__previewModules.game = window.module.exports;
+    window.__previewReady();
+  </script>
+</body>
+</html>
