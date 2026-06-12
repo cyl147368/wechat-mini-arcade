@@ -6,10 +6,15 @@ var path = require("path");
 
 var root = path.resolve(__dirname, "..");
 var requiredFiles = [
+  "app.json",
   "game.js",
   "game.json",
   "project.config.json",
-  "js/logic.js"
+  "js/logic.js",
+  "pages/index/index.js",
+  "pages/index/index.json",
+  "pages/index/index.wxml",
+  "pages/index/index.wxss"
 ];
 
 requiredFiles.forEach(function (file) {
@@ -17,12 +22,16 @@ requiredFiles.forEach(function (file) {
 });
 
 var projectConfig = JSON.parse(fs.readFileSync(path.join(root, "project.config.json"), "utf8"));
+var appConfig = JSON.parse(fs.readFileSync(path.join(root, "app.json"), "utf8"));
 var gameConfig = JSON.parse(fs.readFileSync(path.join(root, "game.json"), "utf8"));
 
 assert.strictEqual(projectConfig.compileType, "game");
 assert.strictEqual(projectConfig.appid, "touristappid");
 assert.strictEqual(projectConfig.setting.es6, true);
 assert.strictEqual(projectConfig.setting.packNpmManually, false);
+assert.deepStrictEqual(appConfig.pages, ["pages/index/index"]);
+assert.strictEqual(appConfig.deviceOrientation, "portrait");
+assert.strictEqual(appConfig.showStatusBar, false);
 assert.strictEqual(gameConfig.deviceOrientation, "portrait");
 assert.strictEqual(gameConfig.showStatusBar, false);
 

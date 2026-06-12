@@ -10,9 +10,14 @@ var releaseDir = path.join(outputRoot, "wechat-mini-arcade-release");
 var releaseZip = path.join(outputRoot, "wechat-mini-arcade-release.zip");
 var fullZip = path.join(outputRoot, "wechat-mini-arcade.zip");
 var requiredReleaseFiles = [
+  "app.json",
   "game.js",
   "game.json",
   "js/logic.js",
+  "pages/index/index.js",
+  "pages/index/index.json",
+  "pages/index/index.wxml",
+  "pages/index/index.wxss",
   "project.config.json"
 ];
 var requiredTests = [
@@ -101,10 +106,14 @@ function assertRuntimeSource() {
 
 function assertConfigs() {
   var project = readJson(path.join(releaseDir, "project.config.json"));
+  var app = readJson(path.join(releaseDir, "app.json"));
   var game = readJson(path.join(releaseDir, "game.json"));
   if (project.compileType !== "game") fail("project compile type", String(project.compileType));
   if (project.appid !== "touristappid") fail("project appid", String(project.appid));
   if (!project.setting || project.setting.packNpmManually !== false) fail("npm packing", "release should not need npm packing");
+  if (!Array.isArray(app.pages) || app.pages[0] !== "pages/index/index") fail("app pages", JSON.stringify(app.pages));
+  if (app.deviceOrientation !== "portrait") fail("app orientation", String(app.deviceOrientation));
+  if (app.showStatusBar !== false) fail("app status bar", String(app.showStatusBar));
   if (game.deviceOrientation !== "portrait") fail("device orientation", String(game.deviceOrientation));
   pass("wechat config", "compileType game, touristappid, portrait, no npm packing");
 }

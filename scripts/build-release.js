@@ -9,14 +9,35 @@ var root = path.resolve(__dirname, "..");
 var outputRoot = path.resolve(root, "..");
 var releaseDir = path.join(outputRoot, "wechat-mini-arcade-release");
 var releaseZip = path.join(outputRoot, "wechat-mini-arcade-release.zip");
+var fullZip = path.join(outputRoot, "wechat-mini-arcade.zip");
 var buildId = String(Date.now()) + "-" + String(Math.floor(Math.random() * 1000000));
 var tempReleaseDir = path.join(outputRoot, ".wechat-mini-arcade-release-" + buildId);
 var tempReleaseZip = path.join(outputRoot, ".wechat-mini-arcade-release-" + buildId + ".zip");
 var files = [
+  "app.json",
+  "game.js",
+  "game.json",
+  "pages/index/index.js",
+  "pages/index/index.json",
+  "pages/index/index.wxml",
+  "pages/index/index.wxss",
+  "project.config.json",
+  "js/logic.js"
+];
+var fullFiles = [
+  ".gitignore",
+  "app.json",
   "game.js",
   "game.json",
   "project.config.json",
-  "js/logic.js"
+  "README.md",
+  "package.json",
+  "open-in-wechat-devtools.command",
+  "js",
+  "pages",
+  "scripts",
+  "test",
+  "preview"
 ];
 
 function rmDir(dir) {
@@ -72,7 +93,10 @@ try {
   if (fs.existsSync(releaseZip)) fs.unlinkSync(releaseZip);
   fs.renameSync(tempReleaseDir, releaseDir);
   fs.renameSync(tempReleaseZip, releaseZip);
+  if (fs.existsSync(fullZip)) fs.unlinkSync(fullZip);
+  childProcess.execFileSync("zip", ["-qr", fullZip].concat(fullFiles), { cwd: root });
   console.log("release package built:", releaseZip);
+  console.log("full package built:", fullZip);
 } catch (error) {
   rmDir(tempReleaseDir);
   if (fs.existsSync(tempReleaseZip)) fs.unlinkSync(tempReleaseZip);

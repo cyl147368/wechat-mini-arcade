@@ -8,9 +8,14 @@ var root = path.resolve(__dirname, "..");
 var releaseDir = path.resolve(root, "..", "wechat-mini-arcade-release");
 var releaseZip = path.resolve(root, "..", "wechat-mini-arcade-release.zip");
 var expectedFiles = [
+  "app.json",
   "game.js",
   "game.json",
   "js/logic.js",
+  "pages/index/index.js",
+  "pages/index/index.json",
+  "pages/index/index.wxml",
+  "pages/index/index.wxss",
   "project.config.json"
 ];
 var drawCalls = 0;
@@ -36,8 +41,12 @@ walk(releaseDir, found);
 assert.deepStrictEqual(found.sort(), expectedFiles.slice().sort());
 
 var projectConfig = JSON.parse(fs.readFileSync(path.join(releaseDir, "project.config.json"), "utf8"));
+var appConfig = JSON.parse(fs.readFileSync(path.join(releaseDir, "app.json"), "utf8"));
 var gameConfig = JSON.parse(fs.readFileSync(path.join(releaseDir, "game.json"), "utf8"));
 assert.strictEqual(projectConfig.compileType, "game");
+assert.deepStrictEqual(appConfig.pages, ["pages/index/index"]);
+assert.strictEqual(appConfig.deviceOrientation, "portrait");
+assert.strictEqual(appConfig.showStatusBar, false);
 assert.strictEqual(gameConfig.deviceOrientation, "portrait");
 
 global.requestAnimationFrame = function () {

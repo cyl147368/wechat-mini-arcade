@@ -9,10 +9,17 @@ var outputRoot = path.resolve(root, "..");
 var releaseZip = path.join(outputRoot, "wechat-mini-arcade-release.zip");
 var fullZip = path.join(outputRoot, "wechat-mini-arcade.zip");
 var expectedReleaseEntries = [
+  "app.json",
   "game.js",
   "game.json",
   "js/",
   "js/logic.js",
+  "pages/",
+  "pages/index/",
+  "pages/index/index.js",
+  "pages/index/index.json",
+  "pages/index/index.wxml",
+  "pages/index/index.wxss",
   "project.config.json"
 ];
 
@@ -60,12 +67,14 @@ assertNoBadEntries(fullEntries, "full zip");
 assertReleaseEntries(releaseEntries);
 
 [
+  "app.json",
   "game.js",
   "game.json",
   "project.config.json",
   "js/logic.js",
   "README.md",
   "package.json",
+  "pages/index/index.js",
   "scripts/build-release.js",
   "scripts/completion-audit.js",
   "scripts/write-qa-report.js",

@@ -9,9 +9,14 @@ var releaseDir = path.resolve(root, "..", "wechat-mini-arcade-release");
 var releaseZip = path.resolve(root, "..", "wechat-mini-arcade-release.zip");
 var cliPath = "/Applications/wechatwebdevtools.app/Contents/MacOS/cli";
 var expectedFiles = [
+  "app.json",
   "game.js",
   "game.json",
   "js/logic.js",
+  "pages/index/index.js",
+  "pages/index/index.json",
+  "pages/index/index.wxml",
+  "pages/index/index.wxss",
   "project.config.json"
 ];
 var warnings = [];
@@ -83,10 +88,14 @@ childProcess.execFileSync(process.execPath, ["-c", path.join(releaseDir, "js", "
 childProcess.execFileSync("unzip", ["-t", releaseZip], { stdio: "ignore" });
 
 var projectConfig = readJson(path.join(releaseDir, "project.config.json"));
+var appConfig = readJson(path.join(releaseDir, "app.json"));
 var gameConfig = readJson(path.join(releaseDir, "game.json"));
 if (projectConfig.compileType !== "game") fail("project.config.json compileType must be game");
 if (projectConfig.appid !== "touristappid") fail("project.config.json appid should be touristappid for direct import");
 if (!projectConfig.setting || projectConfig.setting.packNpmManually !== false) fail("release should not require npm packing");
+if (!Array.isArray(appConfig.pages) || appConfig.pages[0] !== "pages/index/index") fail("app.json pages must include pages/index/index");
+if (appConfig.deviceOrientation !== "portrait") fail("app.json deviceOrientation must be portrait");
+if (appConfig.showStatusBar !== false) fail("app.json showStatusBar must be false");
 if (gameConfig.deviceOrientation !== "portrait") fail("game.json deviceOrientation must be portrait");
 
 var gameSource = fs.readFileSync(path.join(releaseDir, "game.js"), "utf8");
