@@ -14,8 +14,10 @@ var expectedFiles = [
   "cloudfunctions/playerState/package.json",
   "game.js",
   "game.json",
+  "js/cloud-config.js",
   "js/cloud-state.js",
   "js/logic.js",
+  "js/session-ui.js",
   "pages/index/index.js",
   "pages/index/index.json",
   "pages/index/index.wxml",
@@ -56,14 +58,18 @@ function assertOnlyKnownRequires(source) {
   var count = 0;
   var allowed = {
     "./js/logic.js": true,
-    "./js/cloud-state.js": true
+    "./js/cloud-state.js": true,
+    "./js/cloud-config": true,
+    "./js/session-ui": true
   };
   while ((match = requirePattern.exec(source))) {
     count += 1;
     if (!allowed[match[2]]) fail("unexpected runtime require: " + match[2]);
-    if (!fs.existsSync(path.join(releaseDir, match[2]))) fail("missing required release file: " + match[2]);
+    var requiredPath = path.join(releaseDir, match[2]);
+    if (!fs.existsSync(requiredPath) && !/\.js$/.test(requiredPath)) requiredPath += ".js";
+    if (!fs.existsSync(requiredPath)) fail("missing required release file: " + match[2]);
   }
-  if (count !== 2) fail("expected exactly two runtime requires, found " + count);
+  if (count !== 4) fail("expected exactly four runtime requires, found " + count);
 }
 
 function checkCli() {

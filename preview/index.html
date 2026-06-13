@@ -148,8 +148,10 @@
       };
 
       window.require = function (name) {
-        if (name === "./js/logic.js" || name === "js/logic.js") return window.__previewModules.logic;
-        if (name === "./js/cloud-state.js" || name === "js/cloud-state.js") return window.__previewModules.cloudState;
+        if (name === "./js/logic.js" || name === "./js/logic" || name === "js/logic.js" || name === "js/logic") return window.__previewModules.logic;
+        if (name === "./js/cloud-state.js" || name === "./js/cloud-state" || name === "js/cloud-state.js" || name === "js/cloud-state") return window.__previewModules.cloudState;
+        if (name === "./js/cloud-config.js" || name === "./js/cloud-config" || name === "js/cloud-config.js" || name === "js/cloud-config") return window.__previewModules.cloudConfig;
+        if (name === "./js/session-ui.js" || name === "./js/session-ui" || name === "js/session-ui.js" || name === "js/session-ui") return window.__previewModules.sessionUI;
         throw new Error("Unsupported require: " + name);
       };
 
@@ -186,6 +188,18 @@
   <script src="../js/cloud-state.js"></script>
   <script>
     window.__previewModules.cloudState = window.module.exports;
+    window.module = { exports: {} };
+    window.exports = window.module.exports;
+  </script>
+  <script src="../js/cloud-config.js"></script>
+  <script>
+    window.__previewModules.cloudConfig = window.module.exports;
+    window.module = { exports: {} };
+    window.exports = window.module.exports;
+  </script>
+  <script src="../js/session-ui.js"></script>
+  <script>
+    window.__previewModules.sessionUI = window.module.exports;
     window.module = { exports: {} };
     window.exports = window.module.exports;
   </script>

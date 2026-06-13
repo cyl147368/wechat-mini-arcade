@@ -59,7 +59,7 @@ assert.ok(!/\b(const|let|class|async|await|Promise|Number\.isFinite)\b/.test(run
 
 var requireMatches = runtimeSource.match(/require\((["'])(.*?)\1\)/g) || [];
 requireMatches.forEach(function (call) {
-  assert.ok(/require\((["'])\.\/js\/(?:logic|cloud-state)\.js\1\)/.test(call), "unexpected runtime require: " + call);
+  assert.ok(/require\((["'])\.\/js\/(?:logic|cloud-state|cloud-config|session-ui)(?:\.js)?\1\)/.test(call), "unexpected runtime require: " + call);
 });
 
 console.log("project tests passed");

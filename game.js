@@ -2,9 +2,11 @@
 
 var Logic = require("./js/logic.js");
 var CloudState = require("./js/cloud-state.js");
+var CloudConfig = require("./js/cloud-config");
+var SessionUI = require("./js/session-ui");
 
 var GAME_ID = "wechat-mini-arcade";
-var CLOUD_STORAGE_KEY = "wechat-mini-arcade-best-v1";
+var CLOUD_STORAGE_KEY = "wechat-mini-arcade-state-v2";
 
 function numberValue(value) {
   var number = Number(value);
@@ -27,6 +29,99 @@ function sanitizeBestState(input) {
   };
 }
 
+function clonePlain(value, fallback) {
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (error) {
+    return fallback;
+  }
+}
+
+function sanitizeBoard(board, size) {
+  var out = [];
+  for (var y = 0; y < size; y += 1) {
+    var row = [];
+    for (var x = 0; x < size; x += 1) {
+      row.push(Math.max(0, Math.floor(finiteNumber(board && board[y] && board[y][x], 0))));
+    }
+    out.push(row);
+  }
+  return out;
+}
+
+function sanitizePoint(point, fallback) {
+  fallback = fallback || { x: 0, y: 0 };
+  return {
+    x: finiteNumber(point && point.x, fallback.x),
+    y: finiteNumber(point && point.y, fallback.y)
+  };
+}
+
+function sanitizeArcadeState(input) {
+  input = input || {};
+  var best = sanitizeBestState(input.best || input);
+  var current = input.current === "merge" || input.current === "snake" || input.current === "dodge" ? input.current : "";
+  return {
+    version: 2,
+    scene: input.scene === "game" && current ? "game" : "menu",
+    current: current,
+    best: best,
+    merge: {
+      size: 4,
+      board: sanitizeBoard(input.merge && input.merge.board, 4),
+      score: Math.max(0, Math.floor(finiteNumber(input.merge && input.merge.score, 0))),
+      moves: Math.max(0, Math.floor(finiteNumber(input.merge && input.merge.moves, 0))),
+      over: !!(input.merge && input.merge.over),
+      won: !!(input.merge && input.merge.won),
+      rngSeed: Math.max(1, Math.floor(finiteNumber(input.merge && input.merge.rngSeed, Date.now())) >>> 0)
+    },
+    snake: {
+      cols: 18,
+      rows: 24,
+      snake: Array.isArray(input.snake && input.snake.snake) ? input.snake.snake.map(function (part) {
+        return {
+          x: Math.max(0, Math.min(17, Math.floor(finiteNumber(part && part.x, 0)))),
+          y: Math.max(0, Math.min(23, Math.floor(finiteNumber(part && part.y, 0))))
+        };
+      }).slice(0, 432) : null,
+      direction: input.snake && /^(left|right|up|down)$/.test(input.snake.direction) ? input.snake.direction : "right",
+      pendingDirection: input.snake && /^(left|right|up|down)$/.test(input.snake.pendingDirection) ? input.snake.pendingDirection : "right",
+      food: input.snake && input.snake.food ? {
+        x: Math.max(0, Math.min(17, Math.floor(finiteNumber(input.snake.food.x, 0)))),
+        y: Math.max(0, Math.min(23, Math.floor(finiteNumber(input.snake.food.y, 0))))
+      } : null,
+      score: Math.max(0, Math.floor(finiteNumber(input.snake && input.snake.score, 0))),
+      steps: Math.max(0, Math.floor(finiteNumber(input.snake && input.snake.steps, 0))),
+      elapsed: Math.max(0, finiteNumber(input.snake && input.snake.elapsed, 0)),
+      stepTime: Math.max(0.05, finiteNumber(input.snake && input.snake.stepTime, 0.14)),
+      over: !!(input.snake && input.snake.over),
+      rngSeed: Math.max(1, Math.floor(finiteNumber(input.snake && input.snake.rngSeed, Date.now())) >>> 0)
+    },
+    dodge: {
+      player: sanitizePoint(input.dodge && input.dodge.player, { x: 180, y: 552 }),
+      objects: Array.isArray(input.dodge && input.dodge.objects) ? input.dodge.objects.map(function (item) {
+        return {
+          x: finiteNumber(item && item.x, 0),
+          y: finiteNumber(item && item.y, 0),
+          w: Math.max(4, finiteNumber(item && item.w, 22)),
+          h: Math.max(4, finiteNumber(item && item.h, 22)),
+          vy: finiteNumber(item && item.vy, 120),
+          type: item && item.type === "star" ? "star" : "block",
+          hit: !!(item && item.hit)
+        };
+      }).slice(0, 80) : [],
+      spawnTimer: finiteNumber(input.dodge && input.dodge.spawnTimer, 0),
+      score: Math.max(0, finiteNumber(input.dodge && input.dodge.score, 0)),
+      lives: Math.max(0, Math.min(9, Math.floor(finiteNumber(input.dodge && input.dodge.lives, 3)))),
+      time: Math.max(0, finiteNumber(input.dodge && input.dodge.time, 0)),
+      invulnerable: Math.max(0, finiteNumber(input.dodge && input.dodge.invulnerable, 0)),
+      over: !!(input.dodge && input.dodge.over),
+      rngSeed: Math.max(1, Math.floor(finiteNumber(input.dodge && input.dodge.rngSeed, Date.now())) >>> 0)
+    },
+    _clientUpdatedAt: Math.max(0, Math.floor(finiteNumber(input._clientUpdatedAt || input.updatedAt, 0)))
+  };
+}
+
 function ArcadeApp(wxApi) {
   this.wx = wxApi || wx;
   this.canvas = this.wx.createCanvas();
@@ -38,6 +133,8 @@ function ArcadeApp(wxApi) {
   this.buttons = [];
   this.touchStart = null;
   this.lastTime = 0;
+  this.saveTimer = 0;
+  this.localUpdatedAt = 0;
   this.paused = false;
   this.pixelRatio = 1;
   this.best = {
@@ -49,11 +146,13 @@ function ArcadeApp(wxApi) {
     wx: this.wx,
     gameId: GAME_ID,
     storageKey: CLOUD_STORAGE_KEY,
-    sanitize: sanitizeBestState
+    env: CloudConfig.envId,
+    sanitize: sanitizeArcadeState
   });
   this.merge = new Logic.Merge2048Game(4, new Logic.RNG());
   this.snake = new Logic.SnakeGame(18, 24, new Logic.RNG());
   this.dodge = new Logic.DodgeGame(this.width, this.height, new Logic.RNG());
+  this.applyArcadeState(this.readLocalState(), true);
   this.resize();
   this.bindEvents();
   this.startCloudSync();
@@ -83,11 +182,11 @@ ArcadeApp.prototype.writeBest = function (key, score) {
   } catch (error) {
     // Storage is optional in dev tools guest mode; gameplay must continue without it.
   }
-  this.saveCloudBest();
+  this.saveState();
 };
 
 ArcadeApp.prototype.applyBestState = function (remoteBest) {
-  var best = sanitizeBestState(remoteBest);
+  var best = sanitizeBestState(remoteBest && remoteBest.best || remoteBest);
   var changed = false;
   var keys = ["merge", "snake", "dodge"];
   for (var i = 0; i < keys.length; i += 1) {
@@ -103,17 +202,137 @@ ArcadeApp.prototype.applyBestState = function (remoteBest) {
   if (changed) this.draw();
 };
 
+ArcadeApp.prototype.readLocalState = function () {
+  try {
+    if (!this.wx.getStorageSync) return null;
+    var stored = this.wx.getStorageSync(CLOUD_STORAGE_KEY);
+    return stored ? sanitizeArcadeState(stored) : null;
+  } catch (error) {
+    return null;
+  }
+};
+
+ArcadeApp.prototype.snapshotState = function () {
+  return sanitizeArcadeState({
+    version: 2,
+    scene: this.scene,
+    current: this.current,
+    best: this.best,
+    merge: {
+      board: this.merge.board,
+      score: this.merge.score,
+      moves: this.merge.moves,
+      over: this.merge.over,
+      won: this.merge.won,
+      rngSeed: this.merge.rng && this.merge.rng.seed
+    },
+    snake: {
+      snake: this.snake.snake,
+      direction: this.snake.direction,
+      pendingDirection: this.snake.pendingDirection,
+      food: this.snake.food,
+      score: this.snake.score,
+      steps: this.snake.steps,
+      elapsed: this.snake.elapsed,
+      stepTime: this.snake.stepTime,
+      over: this.snake.over,
+      rngSeed: this.snake.rng && this.snake.rng.seed
+    },
+    dodge: {
+      player: this.dodge.player,
+      objects: this.dodge.objects,
+      spawnTimer: this.dodge.spawnTimer,
+      score: this.dodge.score,
+      lives: this.dodge.lives,
+      time: this.dodge.time,
+      invulnerable: this.dodge.invulnerable,
+      over: this.dodge.over,
+      rngSeed: this.dodge.rng && this.dodge.rng.seed
+    },
+    _clientUpdatedAt: Date.now()
+  });
+};
+
+ArcadeApp.prototype.writeLocalState = function (state) {
+  try {
+    state = state || this.snapshotState();
+    this.localUpdatedAt = Number(state._clientUpdatedAt) || Date.now();
+    if (this.wx.setStorageSync) this.wx.setStorageSync(CLOUD_STORAGE_KEY, state);
+  } catch (error) {}
+};
+
+ArcadeApp.prototype.saveState = function () {
+  var state = this.snapshotState();
+  this.writeLocalState(state);
+  if (this.cloudSync && typeof this.cloudSync.save === "function") this.cloudSync.save(state);
+};
+
 ArcadeApp.prototype.saveCloudBest = function () {
-  if (this.cloudSync && typeof this.cloudSync.save === "function") this.cloudSync.save(this.best);
+  this.saveState();
+};
+
+ArcadeApp.prototype.restoreMerge = function (state) {
+  this.merge.rng = new Logic.RNG(state.rngSeed);
+  this.merge.board = clonePlain(state.board, this.merge.board);
+  this.merge.score = state.score;
+  this.merge.moves = state.moves;
+  this.merge.over = state.over;
+  this.merge.won = state.won;
+};
+
+ArcadeApp.prototype.restoreSnake = function (state) {
+  this.snake.rng = new Logic.RNG(state.rngSeed);
+  if (state.snake && state.snake.length) this.snake.snake = clonePlain(state.snake, this.snake.snake);
+  this.snake.direction = state.direction;
+  this.snake.pendingDirection = state.pendingDirection;
+  this.snake.food = state.food ? clonePlain(state.food, null) : null;
+  this.snake.score = state.score;
+  this.snake.steps = state.steps;
+  this.snake.elapsed = state.elapsed;
+  this.snake.stepTime = state.stepTime;
+  this.snake.over = state.over;
+};
+
+ArcadeApp.prototype.restoreDodge = function (state) {
+  this.dodge.rng = new Logic.RNG(state.rngSeed);
+  this.dodge.player = Object.assign({ r: 17 }, clonePlain(state.player, this.dodge.player));
+  this.dodge.objects = clonePlain(state.objects, []);
+  this.dodge.spawnTimer = state.spawnTimer;
+  this.dodge.score = state.score;
+  this.dodge.lives = state.lives;
+  this.dodge.time = state.time;
+  this.dodge.invulnerable = state.invulnerable;
+  this.dodge.over = state.over;
+  this.dodge.resize(this.width, this.height);
+};
+
+ArcadeApp.prototype.applyArcadeState = function (remoteState, skipDraw) {
+  if (!remoteState) return;
+  var state = sanitizeArcadeState(remoteState);
+  var localStamp = Number(this.localUpdatedAt) || 0;
+  if (!skipDraw && state._clientUpdatedAt && localStamp && state._clientUpdatedAt < localStamp) return;
+  this.applyBestState(state);
+  this.best = {
+    merge: Math.max(this.best.merge, state.best.merge),
+    snake: Math.max(this.best.snake, state.best.snake),
+    dodge: Math.max(this.best.dodge, state.best.dodge)
+  };
+  this.restoreMerge(state.merge);
+  this.restoreSnake(state.snake);
+  this.restoreDodge(state.dodge);
+  this.scene = state.scene;
+  this.current = state.current;
+  this.writeLocalState(state);
+  if (!skipDraw) this.draw();
 };
 
 ArcadeApp.prototype.startCloudSync = function () {
   var self = this;
   if (!this.cloudSync || typeof this.cloudSync.start !== "function") return;
-  this.cloudSync.start(function (remoteBest) {
-    if (!remoteBest) return;
-    self.applyBestState(remoteBest);
-    self.saveCloudBest();
+  this.cloudSync.start(function (remoteState) {
+    if (!remoteState) return;
+    self.applyArcadeState(remoteState);
+    self.saveState();
   });
 };
 
@@ -177,7 +396,7 @@ ArcadeApp.prototype.bindEvents = function () {
       self.paused = true;
       self.lastTime = 0;
       self.recordCurrentScore();
-      self.saveCloudBest();
+      self.saveState();
     });
   }
   if (typeof this.wx.onShow === "function") {
@@ -186,8 +405,8 @@ ArcadeApp.prototype.bindEvents = function () {
       self.lastTime = 0;
       self.resize();
       if (self.cloudSync && typeof self.cloudSync.load === "function") {
-        self.cloudSync.load(function (remoteBest) {
-          if (remoteBest) self.applyBestState(remoteBest);
+        self.cloudSync.load(function (remoteState) {
+          if (remoteState) self.applyArcadeState(remoteState);
         });
       }
     });
@@ -221,6 +440,14 @@ ArcadeApp.prototype.onTouchMove = function (event) {
 ArcadeApp.prototype.onTouchEnd = function (event) {
   var point = this.touchPoint(event) || this.touchStart;
   if (!point) return;
+
+  if (SessionUI.hit({ width: this.width, height: this.height, pad: 16 }, point.x, point.y)) {
+    if (this.cloudSync && typeof this.cloudSync.requestUserProfile === "function") {
+      this.cloudSync.requestUserProfile(CloudConfig.profileDesc, this.draw.bind(this));
+    }
+    this.touchStart = null;
+    return;
+  }
 
   var button = this.findButton(point.x, point.y);
   if (button) {
@@ -263,6 +490,7 @@ ArcadeApp.prototype.runAction = function (action) {
     this.recordCurrentScore();
     this.scene = "menu";
     this.current = "";
+    this.saveState();
     return;
   }
   if (action === "restart") {
@@ -293,6 +521,7 @@ ArcadeApp.prototype.resetCurrentGame = function () {
     this.dodge.reset();
   }
   this.lastTime = 0;
+  this.saveState();
 };
 
 ArcadeApp.prototype.recordCurrentScore = function () {
@@ -303,7 +532,10 @@ ArcadeApp.prototype.recordCurrentScore = function () {
 
 ArcadeApp.prototype.handleSwipe = function (direction) {
   if (direction !== "left" && direction !== "right" && direction !== "up" && direction !== "down") return;
-  if (this.current === "merge") this.merge.move(direction);
+  if (this.current === "merge") {
+    var result = this.merge.move(direction);
+    if (result && result.moved) this.saveState();
+  }
   if (this.current === "snake") this.snake.setDirection(direction);
 };
 
@@ -316,6 +548,14 @@ ArcadeApp.prototype.loop = function (timestamp) {
   if (!this.paused && this.scene === "game") {
     if (this.current === "snake") this.snake.update(dt);
     if (this.current === "dodge") this.dodge.update(dt);
+    this.saveTimer += dt;
+    var ended = this.current === "snake" && this.snake.over || this.current === "dodge" && this.dodge.over;
+    if (this.saveTimer > 5 || ended && this.saveTimer >= 0) {
+      this.saveTimer = ended ? -1 : 0;
+      this.recordCurrentScore();
+      this.saveState();
+    }
+    if (!ended && this.saveTimer < 0) this.saveTimer = 0;
   }
   this.draw();
   this.requestFrame(this.loop);
@@ -456,6 +696,7 @@ ArcadeApp.prototype.draw = function () {
   else if (this.current === "merge") this.drawMerge();
   else if (this.current === "snake") this.drawSnake();
   else if (this.current === "dodge") this.drawDodge();
+  SessionUI.draw(this.ctx, { width: this.width, height: this.height, pad: 16 }, this.cloudSync && this.cloudSync.getStatus());
 };
 
 ArcadeApp.prototype.drawMenu = function () {

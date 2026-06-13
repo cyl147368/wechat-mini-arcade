@@ -69,14 +69,18 @@ function assertOnlyInternalRequires(source) {
   var count = 0;
   var allowed = {
     "./js/logic.js": true,
-    "./js/cloud-state.js": true
+    "./js/cloud-state.js": true,
+    "./js/cloud-config": true,
+    "./js/session-ui": true
   };
   while ((match = requirePattern.exec(source))) {
     count += 1;
     assert.ok(allowed[match[2]], "unexpected release require: " + match[2]);
-    assert.ok(fs.existsSync(path.join(releaseDir, match[2])), "required file missing from release");
+    var requiredPath = path.join(releaseDir, match[2]);
+    if (!fs.existsSync(requiredPath) && !/\.js$/.test(requiredPath)) requiredPath += ".js";
+    assert.ok(fs.existsSync(requiredPath), "required file missing from release");
   }
-  assert.strictEqual(count, 2, "release should have exactly two local runtime requires");
+  assert.strictEqual(count, 4, "release should have exactly four local runtime requires");
 }
 
 function assertButtonsInside(app) {

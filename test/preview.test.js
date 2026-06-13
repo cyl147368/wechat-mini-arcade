@@ -10,6 +10,8 @@ var html = fs.readFileSync(previewPath, "utf8");
 
 assert.ok(/<canvas id="stage"/.test(html), "preview should expose a canvas stage");
 assert.ok(/<script src="\.\.\/js\/logic\.js"><\/script>/.test(html), "preview should load shared logic.js");
+assert.ok(/<script src="\.\.\/js\/cloud-config\.js"><\/script>/.test(html), "preview should load cloud config");
+assert.ok(/<script src="\.\.\/js\/session-ui\.js"><\/script>/.test(html), "preview should load session UI");
 assert.ok(/<script src="\.\.\/game\.js"><\/script>/.test(html), "preview should load shared game.js");
 assert.ok(/window\.wx/.test(html), "preview should provide a wx mock");
 assert.ok(/onTouchCancel/.test(html), "preview should provide touch cancel events");
